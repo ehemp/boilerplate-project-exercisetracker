@@ -15,7 +15,8 @@
 		"mongoose": "^5.13.22"
 	},
 	"repository": {
-		"url": "https://github.com/freeCodeCamp/boilerplate-project-exercisetracker"
+		// "url": "https://github.com/freeCodeCamp/boilerplate-project-exercisetracker",
+		"url": "https://github.com/ehemp/boilerplate-project-exercisetracker.git"
 	},
 	"license": "MIT",
 	"keywords": [
