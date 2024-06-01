@@ -14,6 +14,31 @@ app.use(cors())
 app.use(express.static('public'))
 app.use(bodyParser.urlencoded({extended: false}));
 
+app.use('/api/users/:_id/logs?', (req, res, next) => {
+  console.log(req.params)
+  req.id = req.params._id;
+  req.lim = parseInt(req.query.limit);
+  Exercise.find({_id: req.id}).find({ log: {date: {$gte: new Date(req.query.from),
+    $lte: new Date(req.query.to)}}}).limit(req.lim).exec((err, logDate) => {
+            if (err) {console.log("Get Logs error: ", err); res.json(err)}
+            console.log("MiddleWARE LOG: ", logDate, req.lim, "REQ.URL: ", req.url)
+            req.logDate = logDate;
+            })
+  next();
+}, (req, res, next) => {
+  User.findOne({_id: req.id}, (err, logData) => {
+    console.log("LOGDATE: ", req.logDate, "logData: ", logData)
+    res.json({
+      username: logData.username,
+      _id: req.id,
+      count: req.logDate[0].log.length,
+      log: req.logDate
+    })
+    //next();
+  })
+})
+
+
 let User;
 let Exercise;
 let Logs;
@@ -35,18 +60,19 @@ const userSchema = new mongoose.Schema({
 )
 
 const exerciseSchema = new mongoose.Schema({
-  username: {
-    type: String,
-  },
-  description: {
+  //_id : false,
+  log: [{
+    _id : false,
+    description: {
       type: String,
     },
   duration: {
     type: Number,
   },
   date: {
-    type: String,
-  }, 
+    type: Date,
+  } 
+  }],
 },
 { versionKey: false }
 );
@@ -70,7 +96,7 @@ const logSchema = new mongoose.Schema({
     type: Number,
   },
   date: {
-    type: String,
+    type: Date,
   } 
   },],
 },
@@ -97,23 +123,39 @@ const createAndSaveUser = (userAdded, done) => {
     if (err) {console.log("Logs save error: ", err)}
     return data;
   })
+
+  const exercise = new Exercise({_id: user._id, log: []})
+  exercise.save(function(err, data) {
+    if (err) {console.log("Exercise save error: ", err)}
+    return data;
+  })
+
 };
 
 const findIdCreateAndSaveExercise = (infoAdded, done) => {
 
-  User.findById(infoAdded._id, (err, data) => {
+  User.findById(infoAdded._id, (err, userData) => {
     if (err) {return console.log('findIdCreateAndSaveExercise(): ',err)}
   
-    
+
 //const exerciseObj = {description: infoAdded.description, duration: infoAdded.duration, date: infoAdded.date}
-User.findByIdAndUpdate(infoAdded._id, {$set: {description: infoAdded.description, duration: infoAdded.duration, date: infoAdded.date}},  { new: true}, (err, data) => {
+/*User.findByIdAndUpdate(infoAdded._id, {$set: {description: infoAdded.description, duration: infoAdded.duration, date: infoAdded.date}},  { new: true}, (err, data) => {
   if (err) {console.error(err)}
     //var exerciseObj = {_id: data._id, username: data.username, date: data.date, duration: data.duration, description: data.description}
     done(null, data)
-  })
+  })*/
 
-  
 
+  Exercise.findById(userData._id, (err, data) => {
+    if (err) {console.error(err)}
+    data.log.push({description: infoAdded.description, duration: infoAdded.duration, date: new Date(infoAdded.date)})
+      var exerciseObj = {_id: userData._id, username: userData.username, date: data.date, duration: data.duration, description: data.description}
+      data.save((err, saveData) => {
+        if (err) {console.log("Save Logs Error: ", err)}
+        return saveData;
+        })
+      done(null, exerciseObj)
+    })
 
     
   Logs.findById(infoAdded._id, (err, data) => {
@@ -150,7 +192,7 @@ app.route('/api/users').post((req, res) => {
 })
 app.route('/api/users/:_id/exercises').post((req, res) => {
   //var id = req.body[':_id'];
-  
+ 
   /*if (req.body[':_id'] === undefined) {
     id = req.params._id;
   }*/
@@ -162,7 +204,7 @@ app.route('/api/users/:_id/exercises').post((req, res) => {
     date = new Date(date);
   }
   //date = new Date(date).toDateString();
-  var exerciseObj = {_id: id, date: date.toDateString(), duration: duration, description: description  }
+  var exerciseObj = {_id: id, date: date, duration: duration, description: description  }
   //console.log("POST INFO: ",exerciseObj, " PATH: ", req.path, " PARAMS: ", req.params)
   findIdCreateAndSaveExercise(exerciseObj, (err, data) => {
     if (err) { console.log(err) }
@@ -184,47 +226,41 @@ app.get('/api/users', (req, res) => {
 
 })
 
-app.get('/api/users/:_id/logs?', (req, res) => {
-  console.log(req.url)
 
+
+app.get('/api/users/:_id/logs?/:from?/:to?/:limit?', (req, res) => {
+  //console.log(req.url)
+  console.log(req.query)
   var id = req.params._id;
-  console.log("Less Than: ", new Date(req.query.from) < new Date(req.query.to))
-  if (req.query.from !== "" && id !== ':_id') {
+  
+ var lim = parseInt(req.query.limit);
 
-    /*Logs.find({"log.date": {$gte: new Date(req.query.from),
-      $lte: new Date(req.query.to)}}, ((err, data) => {
-        if (err) {console.log("Get Logs error: ", err)}
-          console.log("CHAINED: ", data, new Date(req.query.from))
-        res.json(data)
-          })
-        ) 
+  /*Logs.findById(id, (err, data) => {
+    if (err) {console.log(err)}
 
-        }*/
-
-        Logs.find({log: { $elemMatch: {date: {$gte: new Date(req.query.from),
-      $lt: new Date(req.query.to)}}} }, ((err, data) => {
-            if (err) {console.log("Get Logs error: ", err)}
-              console.log("CHAINED: ", data, new Date(req.query.to))
-            res.json(data)
-              })
-            ) 
-    
-            }
-
-  else if (id !== ':_id') {
-    Logs.findById(id, (err, data) => {
-      if (err) {console.log("Get Logs error: ", err)}
-      res.json(data)
-      })
+    if (req.query.from) {
+      console.log("REQ.QUERY.LIMIT: ", typeof lim)
+      Logs.find({_id: id}).limit(lim).find({ 'log.date': {$gte: new Date(req.query.from),
+        $lte: new Date(req.query.to)}}).exec((err, data) => {
+                if (err) {console.log("Get Logs error: ", err); res.json(err)}
+                console.log("LOG: ", data, lim, "REQ.URL: ", req.url)
+              res.json(data)
+                })
     }
-  else {
-    Logs.find({}, (err, data) => {
-      if (err) {console.log("Get Logs error: ", err)}
+    else if (req.query.limit) {
+      Logs.find({_id: id}).limit(lim).exec((err, data) => {
+        if (err) {console.log("Get Logs error: ", err); res.json(err)}
+        console.log("LOG: ", data, req.query.limit, "LIMIT REQ.URL: ", req.url)
       res.json(data)
-      console.log(req.query)
-    
-    });
-  }
+        })
+    } else {
+      res.json(data)
+    }
+
+  })*/
+
+
+
 
 });
 
