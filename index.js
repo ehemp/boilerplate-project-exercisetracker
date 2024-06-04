@@ -188,6 +188,9 @@ const exerciseSchema = new mongoose.Schema({
     id : {
       type: ObjectId,
     },
+    username: {
+      type: String,
+    },
     description: {
       type: String,
     },
@@ -257,14 +260,14 @@ const findIdCreateAndSaveExercise = (infoAdded, done) => {
 
 
     //console.log('INOFADDED: ', infoAdded)
-    const exercise = new Exercise({id: userData._id, description: infoAdded.description, duration: infoAdded.duration, date: Math.floor(new Date(infoAdded.date))})
+    const exercise = new Exercise({id: userData._id, username: userData.username, description: infoAdded.description, duration: infoAdded.duration, date: Math.floor(new Date(infoAdded.date))})
     exercise.save(function(err, data) {
       if (err) {console.log("Save Logs Error: ", err)}
       console.log("EXERCISE DATA: ", data)
       var {_id, username} = userData
         //var exerciseObj = {_id: userData._id, username: userData.username, date: infoAdded.date.toDateString(), duration: infoAdded.duration, description: infoAdded.description}
-        var exerciseObj = { _id: _id, username: username, date: infoAdded.date.toDateString(), duration: Number(infoAdded.duration), description: infoAdded.description }
-        done(null, exerciseObj)
+        req.exerciseObj2 = { _id: _id, username: username, date: infoAdded.date.toDateString(), duration: Number(infoAdded.duration), description: infoAdded.description }
+        done(null, data)
     })
 
 
@@ -301,7 +304,9 @@ app.route('/api/users/:_id/exercises').post((req, res) => {
   //console.log("POST INFO: ",exerciseObj, " PATH: ", req.path, " PARAMS: ", req.params)
   findIdCreateAndSaveExercise(req.exerciseObj, (err, data) => {
     if (err) { console.log(err) }
-    res.json(data);
+    var {_id, username, description, duration, date} = data;
+    req.exerciseObj3 = {_id: _id, username: username, description: description, duration: duration, date: date.toDateString()}
+    res.json(req.exerciseObj3);
     console.log("POST EXERCISE: ", data + " is saved in the db.")
     
     
