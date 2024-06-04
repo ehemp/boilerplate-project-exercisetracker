@@ -5,7 +5,7 @@ const req = require('express/lib/request')
 const bodyParser = require('body-parser');
 var mongoose = require('mongoose');
 const { type } = require('express/lib/response');
-const { Int32 } = require('mongodb');
+const { Int32, ObjectId } = require('mongodb');
 const connectStr = "mongodb+srv://ehempfling:4clJYTNDrbN48Gfe@cluster0.dyaznbi.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 mongoose.connect(connectStr, { useNewUrlParser: true, useUnifiedTopology: true });
 require('dotenv').config()
@@ -14,28 +14,151 @@ app.use(cors())
 app.use(express.static('public'))
 app.use(bodyParser.urlencoded({extended: false}));
 
+app.use('/', (req, res, next) => {
+
+  console.log("SLASH ONLY!! ", req.query)
+  next();
+})
+
 app.use('/api/users/:_id/logs?', (req, res, next) => {
-  console.log(req.params)
+  console.log(req.query)
   req.id = req.params._id;
   req.lim = parseInt(req.query.limit);
-  Exercise.find({_id: req.id}).find({ log: {date: {$gte: new Date(req.query.from),
-    $lte: new Date(req.query.to)}}}).limit(req.lim).exec((err, logDate) => {
+  Exercise.find({ id: req.id }, (err, dataId) => {
+    //console.log("FIND FULL EXERCISE: ", dataId)
+    req.count = dataId.length;
+  })
+  if (req.query.from && req.query.to && req.query.limit) {
+    Exercise.find({id: req.id.toString()}).find({ date: {$gte: Math.floor(new Date(req.query.from)),
+      $lte: Math.floor(new Date(req.query.to))}}, (err, logDate) => {
+        if (err) {return console.log("From/To", err)}
+        console.log("LOGDATE: ", logDate)
+        req.logDate = []
+        for (i of logDate) {
+          var  { description, duration, date } =  i
+          req.dateObj = { description: description, duration: duration, date: date.toDateString() }
+          if (req.id.toString() === i.id.toString()) {
+            req.logDate.push(req.dateObj)
+          }
+        }
+        console.log("find DATE TO & FROM & LIMIT: ", req.logDate)
+      }).limit(req.lim)
+    next();
+  }
+  
+  else if (req.query.from && req.query.to && !req.query.limit) {
+    Exercise.find({ date: {$gte: new Date(req.query.from),
+      $lte: new Date(req.query.to)}}, (err, logDate) => {
+        if (err) {return console.log("From/To", err)}
+        //req.logDate = [...logDate].map(({ description, duration, date}) => {description, duration, date});
+        req.logDate = []
+        for (i of logDate) {
+          var  { description, duration, date } =  i
+          req.dateObj = { description: description, duration: duration, date: date.toDateString() }
+          //console.log("REQ.ID: ", req.id, "logDate.ID: ", i.id)
+          if (req.id.toString() === i.id.toString()) {
+            req.logDate.push(req.dateObj)
+          }
+          
+        }
+        console.log("find DATE FROM & TO no LIMIT: ", req.logDate, "COUNT: ", logDate.length)
+        //return req.logDate;
+      })
+    next();
+  }
+
+  else if (req.query.from && !req.query.to) {
+    Exercise.find({ date: {$gte: new Date(req.query.from)}}, (err, logDate) => {
+      if (err) {return console.log("From", err)}
+        //req.logDate = [...logDate].map(({ description, duration, date}) => {description, duration, date});
+        req.logDate = []
+        for (i of logDate) {
+          var  { description, duration, date } =  i
+          req.dateObj = { description: description, duration: duration, date: date.toDateString() }
+          if (req.id.toString() === i.id.toString()) {
+            req.logDate.push(req.dateObj)
+          }
+        }
+        console.log("find DATE FROM ONLY: ", req.logDate)
+
+      }).limit(req.lim)
+
+    next();
+  }
+
+  else if (!req.query.from && req.query.to) {
+    Exercise.find({ date: {$gte: new Date(req.query.to)}}, (err, logDate) => {
+      if (err) {return console.log("To", err)}
+      //req.logDate = [...logDate].map(({ description, duration, date}) => {description, duration, date});
+      req.logDate = []
+      for (i of logDate) {
+        var  { description, duration, date } =  i
+        req.dateObj = { description: description, duration: duration, date: date.toDateString() }
+        if (req.id.toString() === i.id.toString()) {
+          req.logDate.push(req.dateObj)
+        }
+      }
+      console.log("find DATE TO ONLY: ", req.logDate)
+      //return req.logDate;
+    }).limit(req.lim)/*.exec((err, logDate) => {
             if (err) {console.log("Get Logs error: ", err); res.json(err)}
             console.log("MiddleWARE LOG: ", logDate, req.lim, "REQ.URL: ", req.url)
             req.logDate = logDate;
-            })
+            })*/
   next();
+  }
+
+  else if (!req.query.from && !req.query.to && req.query.limit) {
+    Exercise.find({id: req.id}, (err, logDate) => {
+      if (err) {return console.log("Limit Only", err)}
+      //req.logDate = [...logDate].map(({ description, duration, date}) => {description, duration, date});
+      req.logDate = []
+      for (i of logDate) {
+        var  { description, duration, date } =  i
+        req.dateObj = { description: description, duration: duration, date: date.toDateString() }
+        if (req.id.toString() === i.id.toString()) {
+          req.logDate.push(req.dateObj)
+        }
+      }
+      console.log("find DATE LIMIT ONLY: ", req.logDate)
+      //return req.logDate;
+    }).limit(req.lim)/*.exec((err, logDate) => {
+            if (err) {console.log("Get Logs error: ", err); res.json(err)}
+            console.log("MiddleWARE LOG: ", logDate, req.lim, "REQ.URL: ", req.url)
+            req.logDate = logDate;
+            })*/
+  next();
+  }
+
+  else {
+    Exercise.find({id: req.id}, (err, logDate) => {
+      req.logDate = []
+      for (i of logDate) {
+        var  { description, duration, date } =  i
+        req.dateObj = { description: description, duration: duration, date: date.toDateString() }
+        if (req.id.toString() === i.id.toString()) {
+          req.logDate.push(req.dateObj)
+        }
+      }
+      console.log("find DATE ELSE ONLY: ", req.logDate)
+    })
+    next();
+  }
+
 }, (req, res, next) => {
-  User.findOne({_id: req.id}, (err, logData) => {
-    console.log("LOGDATE: ", req.logDate, "logData: ", logData)
+  User.findById(req.id, (err, logData) => {
+    console.log("LOGDATE: ", req.logDate, "logData: ", logData, "URL: ", req.url, "PATH: ", req.path)
     res.json({
       username: logData.username,
       _id: req.id,
-      count: req.logDate[0].log.length,
-      log: req.logDate
+    count: req.count,
+    log: req.logDate
+    //log: { description: req.logDate.description, duration: req.logDate.duration, date: new Date(req.logDate.date).toDateString() }
     })
-    //next();
+    next();
   })
+
+
 })
 
 
@@ -61,8 +184,10 @@ const userSchema = new mongoose.Schema({
 
 const exerciseSchema = new mongoose.Schema({
   //_id : false,
-  log: [{
-    _id : false,
+  //log: [{
+    id : {
+      type: ObjectId,
+    },
     description: {
       type: String,
     },
@@ -72,7 +197,7 @@ const exerciseSchema = new mongoose.Schema({
   date: {
     type: Date,
   } 
-  }],
+  //}],
 },
 { versionKey: false }
 );
@@ -85,7 +210,7 @@ const logSchema = new mongoose.Schema({
     type: Number,
   },
   _id: {
-    type: String,
+    type: ObjectId,
   },
   log: [{
     _id : false,
@@ -118,17 +243,7 @@ const createAndSaveUser = (userAdded, done) => {
     }
   })
   
-  const logs = new Logs({username: userAdded, count: 0, _id: user._id, log: []})
-  logs.save(function(err, data) {
-    if (err) {console.log("Logs save error: ", err)}
-    return data;
-  })
 
-  const exercise = new Exercise({_id: user._id, log: []})
-  exercise.save(function(err, data) {
-    if (err) {console.log("Exercise save error: ", err)}
-    return data;
-  })
 
 };
 
@@ -138,40 +253,20 @@ const findIdCreateAndSaveExercise = (infoAdded, done) => {
     if (err) {return console.log('findIdCreateAndSaveExercise(): ',err)}
   
 
-//const exerciseObj = {description: infoAdded.description, duration: infoAdded.duration, date: infoAdded.date}
-/*User.findByIdAndUpdate(infoAdded._id, {$set: {description: infoAdded.description, duration: infoAdded.duration, date: infoAdded.date}},  { new: true}, (err, data) => {
-  if (err) {console.error(err)}
-    //var exerciseObj = {_id: data._id, username: data.username, date: data.date, duration: data.duration, description: data.description}
-    done(null, data)
-  })*/
 
 
-  Exercise.findById(userData._id, (err, data) => {
-    if (err) {console.error(err)}
-    data.log.push({description: infoAdded.description, duration: infoAdded.duration, date: new Date(infoAdded.date)})
-      var exerciseObj = {_id: userData._id, username: userData.username, date: data.date, duration: data.duration, description: data.description}
-      data.save((err, saveData) => {
-        if (err) {console.log("Save Logs Error: ", err)}
-        return saveData;
-        })
-      done(null, exerciseObj)
-    })
 
-    
-  Logs.findById(infoAdded._id, (err, data) => {
-    if (err) {console.log(err)}
-    data.log.push({description: infoAdded.description, duration: infoAdded.duration, date: new Date(infoAdded.date)})
-    var length = data.log.length;
-    Logs.findByIdAndUpdate(data._id, {count: length}, {new: true}, (err, data2) => {
-      if (err) {console.log(err)}
-      return data2;
-    })
-    data.save((err, saveData) => {
+    //console.log('INOFADDED: ', infoAdded)
+    const exercise = new Exercise({id: userData._id, description: infoAdded.description, duration: infoAdded.duration, date: Math.floor(new Date(infoAdded.date))})
+    exercise.save(function(err, data) {
       if (err) {console.log("Save Logs Error: ", err)}
-      return saveData;
-      })
- 
+      console.log("EXERCISE DATA: ", data)
+      var {_id, username} = userData
+        //var exerciseObj = {_id: userData._id, username: userData.username, date: infoAdded.date.toDateString(), duration: infoAdded.duration, description: infoAdded.description}
+        var exerciseObj = { _id: _id, username: username, date: infoAdded.date.toDateString(), duration: Number(infoAdded.duration), description: infoAdded.description }
+        done(null, exerciseObj)
     })
+
 
   })
 };
@@ -191,11 +286,9 @@ app.route('/api/users').post((req, res) => {
   })
 })
 app.route('/api/users/:_id/exercises').post((req, res) => {
-  //var id = req.body[':_id'];
+
  
-  /*if (req.body[':_id'] === undefined) {
-    id = req.params._id;
-  }*/
+
   var id = id = req.params._id;
   var { description, duration, date } = req.body;
   if (date === undefined || date === null || date === "") {
@@ -204,12 +297,12 @@ app.route('/api/users/:_id/exercises').post((req, res) => {
     date = new Date(date);
   }
   //date = new Date(date).toDateString();
-  var exerciseObj = {_id: id, date: date, duration: duration, description: description  }
+  req.exerciseObj = {_id: id, date: date, duration: duration, description: description  }
   //console.log("POST INFO: ",exerciseObj, " PATH: ", req.path, " PARAMS: ", req.params)
-  findIdCreateAndSaveExercise(exerciseObj, (err, data) => {
+  findIdCreateAndSaveExercise(req.exerciseObj, (err, data) => {
     if (err) { console.log(err) }
     res.json(data);
-    console.log(data + " is saved in the db.")
+    console.log("POST EXERCISE: ", data + " is saved in the db.")
     
     
   })
